@@ -47,6 +47,7 @@ COPY --from=build_gst /home/build /
 COPY --from=build_dldt /home/build /
 include(common-build-tools.m4)
 include(install.pkgs.m4)
+include(install.m4)
 
 include(opencv.m4)
 include(gstreamer-videoanalytics.m4)
@@ -61,8 +62,7 @@ WORKDIR /home
 include(install.pkgs.m4)
 
 # Install
-COPY --from=build /home/build /
-COPY --from=build_gst /home/build /
-COPY --from=build_dldt /home/build /
-COPY --from=build_gst_analytics /home/build /
-include(install.m4)
+#COPY --from=build_gst /home/build /
+#COPY --from=build_dldt /home/build /
+#COPY --from=build_gst_analytics /home/build /
+#include(install.m4)

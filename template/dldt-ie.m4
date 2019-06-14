@@ -10,7 +10,7 @@ ifelse(index(DOCKER_IMAGE,centos),-1,,dnl
 RUN yum install -y -q boost-devel glibc-static glibc-devel libstdc++-static libstdc++-devel libstdc++ libgcc libusbx-devel openblas-devel;
 )dnl
 ifelse(index(DOCKER_IMAGE,ubuntu),-1,,dnl
-RUN apt-get -y install libusb-1.0.0-dev
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install libusb-1.0.0-dev
 )dnl
 
 RUN git clone -b ${DLDT_VER} ${DLDT_REPO} && \

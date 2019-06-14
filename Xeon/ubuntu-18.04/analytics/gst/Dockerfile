@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -39,6 +40,40 @@ RUN  wget -O - ${YASM_REPO} | tar xz && \
      ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
      make -j8 && \
      make install
+
+
+FROM ubuntu:18.04 AS build_gst
+WORKDIR /home
+COPY --from=build /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
+
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+
 
 # Build ogg
 ARG OGG_VER=1.3.3
@@ -193,80 +228,6 @@ RUN git clone ${SVT_VP9_REPO} && \
     make install DESTDIR=/home/build && \
     make install 
 
-# Build DLDT-Inference Engine
-ARG DLDT_VER=2019_R1.1
-ARG DLDT_REPO=https://github.com/opencv/dldt.git
-ARG DLDT_C_API_1=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0001-Add-inference-engine-C-API.patch
-ARG DLDT_C_API_2=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0002-Change-to-match-image-with-separate-planes.patch
-ARG DLDT_C_API_3=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0003-Refine-IE-C-API.patch
-ARG DLDT_C_API_4=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0004-Fix-code-style-and-symbols-visibility-for-2019R1.patch
-
-RUN apt-get -y install libusb-1.0.0-dev
-
-RUN git clone -b ${DLDT_VER} ${DLDT_REPO} && \
-    cd dldt && \
-    git submodule init && \
-    git submodule update --recursive && \
-    cd inference-engine && \
-    wget -O - ${DLDT_C_API_1} | patch -p2 && \
-    wget -O - ${DLDT_C_API_2} | patch -p2 && \
-    wget -O - ${DLDT_C_API_3} | patch -p2 && \
-    wget -O - ${DLDT_C_API_4} | patch -p2 && \
-    mkdir build && \
-    cd build && \
-    cmake  -DCMAKE_INSTALL_PREFIX=/opt/intel/dldt -DLIB_INSTALL_PATH=/opt/intel/dldt -DENABLE_MKL_DNN=ON -DENABLE_CLDNN=OFF -DENABLE_SAMPLES=OFF .. && \
-    make -j $(nproc) && \
-    rm -rf ../bin/intel64/Release/lib/libgtest* && \
-    rm -rf ../bin/intel64/Release/lib/libgmock* && \
-    rm -rf ../bin/intel64/Release/lib/libmock* && \
-    rm -rf ../bin/intel64/Release/lib/libtest*
-
-ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-
-RUN mkdir -p /opt/intel/dldt/inference-engine/include && \
-    cp -r dldt/inference-engine/include/* /opt/intel/dldt/inference-engine/include && \
-    mkdir -p ${libdir} && \
-    cp -r dldt/inference-engine/bin/intel64/Release/lib/* ${libdir} && \
-    mkdir -p /opt/intel/dldt/inference-engine/src && \
-    cp -r dldt/inference-engine/src/* /opt/intel/dldt/inference-engine/src/ && \
-    mkdir -p /opt/intel/dldt/inference-engine/share && \
-    cp -r dldt/inference-engine/build/share/* /opt/intel/dldt/inference-engine/share/ && \
-    mkdir -p /opt/intel/dldt/inference-engine/external/ && \
-    cp -r dldt/inference-engine/temp/tbb /opt/intel/dldt/inference-engine/external/
-
-RUN mkdir -p build/opt/intel/dldt/inference-engine/include && \
-    cp -r dldt/inference-engine/include/* build/opt/intel/dldt/inference-engine/include && \
-    mkdir -p build${libdir} && \
-    cp -r dldt/inference-engine/bin/intel64/Release/lib/* build${libdir} && \
-    mkdir -p build/opt/intel/dldt/inference-engine/src && \
-    cp -r dldt/inference-engine/src/* build/opt/intel/dldt/inference-engine/src/ && \
-    mkdir -p build/opt/intel/dldt/inference-engine/share && \
-    cp -r dldt/inference-engine/build/share/* build/opt/intel/dldt/inference-engine/share/ && \
-    mkdir -p build/opt/intel/dldt/inference-engine/external/ && \
-    cp -r dldt/inference-engine/temp/tbb build/opt/intel/dldt/inference-engine/external/
-
-RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/opt/intel/dldt/inference-engine; do \
-        pkgconfiglibdir="$p/lib/x86_64-linux-gnu" && \
-        mkdir -p "${pkgconfiglibdir}/pkgconfig" && \
-        pc="${pkgconfiglibdir}/pkgconfig/dldt.pc" && \
-        echo "prefix=/opt" > "$pc" && \
-        echo "libdir=${libdir}" >> "$pc" && \
-        echo "includedir=/opt/intel/dldt/inference-engine/include" >> "$pc" && \
-        echo "" >> "$pc" && \
-        echo "Name: DLDT" >> "$pc" && \
-        echo "Description: Intel Deep Learning Deployment Toolkit" >> "$pc" && \
-        echo "Version: 5.0" >> "$pc" && \
-        echo "" >> "$pc" && \
-        echo "Libs: -L\${libdir} -linference_engine -linference_engine_c_wrapper" >> "$pc" && \
-        echo "Cflags: -I\${includedir}" >> "$pc"; \
-    done;
-
-ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
-
-#install Model Optimizer in the DLDT for Dev
-
-
 
 # Build the gstremaer core
 ARG GST_VER=1.16.0
@@ -419,6 +380,161 @@ RUN cd SVT-AV1/gstreamer-plugin && \
     make install DESTDIR=/home/build && \
     make install
 
+
+FROM ubuntu:18.04 AS build_dldt
+WORKDIR /home
+COPY --from=build /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
+
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+
+RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
+    DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends libnuma1 libssl1.1 libglib2.0 libpango-1.0-0 libpangocairo-1.0-0 gobject-introspection libcurl3-gnutls libpng16-16 libxv1 libvisual-0.4-0 libgl1-mesa-glx libpango-1.0-0 libtheora0 libcdparanoia0 libasound2 libsoup2.4-1 libjpeg8 libjpeg-turbo8 ; \
+    rm -rf /var/lib/apt/lists/*;
+
+# Build DLDT-Inference Engine
+ARG DLDT_VER=2019_R1.1
+ARG DLDT_REPO=https://github.com/opencv/dldt.git
+ARG DLDT_C_API_1=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0001-Add-inference-engine-C-API.patch
+ARG DLDT_C_API_2=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0002-Change-to-match-image-with-separate-planes.patch
+ARG DLDT_C_API_3=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0003-Refine-IE-C-API.patch
+ARG DLDT_C_API_4=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0004-Fix-code-style-and-symbols-visibility-for-2019R1.patch
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install libusb-1.0.0-dev
+
+RUN git clone -b ${DLDT_VER} ${DLDT_REPO} && \
+    cd dldt && \
+    git submodule init && \
+    git submodule update --recursive && \
+    cd inference-engine && \
+    wget -O - ${DLDT_C_API_1} | patch -p2 && \
+    wget -O - ${DLDT_C_API_2} | patch -p2 && \
+    wget -O - ${DLDT_C_API_3} | patch -p2 && \
+    wget -O - ${DLDT_C_API_4} | patch -p2 && \
+    mkdir build && \
+    cd build && \
+    cmake  -DCMAKE_INSTALL_PREFIX=/opt/intel/dldt -DLIB_INSTALL_PATH=/opt/intel/dldt -DENABLE_MKL_DNN=ON -DENABLE_CLDNN=OFF -DENABLE_SAMPLES=OFF .. && \
+    make -j $(nproc) && \
+    rm -rf ../bin/intel64/Release/lib/libgtest* && \
+    rm -rf ../bin/intel64/Release/lib/libgmock* && \
+    rm -rf ../bin/intel64/Release/lib/libmock* && \
+    rm -rf ../bin/intel64/Release/lib/libtest*
+
+ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
+
+RUN mkdir -p /opt/intel/dldt/inference-engine/include && \
+    cp -r dldt/inference-engine/include/* /opt/intel/dldt/inference-engine/include && \
+    mkdir -p ${libdir} && \
+    cp -r dldt/inference-engine/bin/intel64/Release/lib/* ${libdir} && \
+    mkdir -p /opt/intel/dldt/inference-engine/src && \
+    cp -r dldt/inference-engine/src/* /opt/intel/dldt/inference-engine/src/ && \
+    mkdir -p /opt/intel/dldt/inference-engine/share && \
+    cp -r dldt/inference-engine/build/share/* /opt/intel/dldt/inference-engine/share/ && \
+    mkdir -p /opt/intel/dldt/inference-engine/external/ && \
+    cp -r dldt/inference-engine/temp/tbb /opt/intel/dldt/inference-engine/external/
+
+RUN mkdir -p build/opt/intel/dldt/inference-engine/include && \
+    cp -r dldt/inference-engine/include/* build/opt/intel/dldt/inference-engine/include && \
+    mkdir -p build${libdir} && \
+    cp -r dldt/inference-engine/bin/intel64/Release/lib/* build${libdir} && \
+    mkdir -p build/opt/intel/dldt/inference-engine/src && \
+    cp -r dldt/inference-engine/src/* build/opt/intel/dldt/inference-engine/src/ && \
+    mkdir -p build/opt/intel/dldt/inference-engine/share && \
+    cp -r dldt/inference-engine/build/share/* build/opt/intel/dldt/inference-engine/share/ && \
+    mkdir -p build/opt/intel/dldt/inference-engine/external/ && \
+    cp -r dldt/inference-engine/temp/tbb build/opt/intel/dldt/inference-engine/external/
+
+RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/opt/intel/dldt/inference-engine; do \
+        pkgconfiglibdir="$p/lib/x86_64-linux-gnu" && \
+        mkdir -p "${pkgconfiglibdir}/pkgconfig" && \
+        pc="${pkgconfiglibdir}/pkgconfig/dldt.pc" && \
+        echo "prefix=/opt" > "$pc" && \
+        echo "libdir=${libdir}" >> "$pc" && \
+        echo "includedir=/opt/intel/dldt/inference-engine/include" >> "$pc" && \
+        echo "" >> "$pc" && \
+        echo "Name: DLDT" >> "$pc" && \
+        echo "Description: Intel Deep Learning Deployment Toolkit" >> "$pc" && \
+        echo "Version: 5.0" >> "$pc" && \
+        echo "" >> "$pc" && \
+        echo "Libs: -L\${libdir} -linference_engine -linference_engine_c_wrapper" >> "$pc" && \
+        echo "Cflags: -I\${includedir}" >> "$pc"; \
+    done;
+
+ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+
+#install Model Optimizer in the DLDT for Dev
+
+
+
+
+FROM ubuntu:18.04 AS build_gst_analytics
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_gst /home/build /
+COPY --from=build_dldt /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
+
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+
+RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
+    DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends libnuma1 libssl1.1 libglib2.0 libpango-1.0-0 libpangocairo-1.0-0 gobject-introspection libcurl3-gnutls libpng16-16 libxv1 libvisual-0.4-0 libgl1-mesa-glx libpango-1.0-0 libtheora0 libcdparanoia0 libasound2 libsoup2.4-1 libjpeg8 libjpeg-turbo8 ; \
+    rm -rf /var/lib/apt/lists/*;
+ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
+
+
 ARG OPENCV_VER=4.1.0
 ARG OPENCV_REPO=https://github.com/opencv/opencv/archive/${OPENCV_VER}.tar.gz
 
@@ -434,17 +550,9 @@ RUN wget ${OPENCV_REPO} && \
     make install DESTDIR=/home/build && \
     make install
 
-RUN apt-get install -y -q --no-install-recommends gtk-doc-tools
+RUN apt-get update && apt-get install -y -q --no-install-recommends gtk-doc-tools
 
 
-
-
-ARG PAHO_VER=1.3.0
-ARG PAHO_REPO=https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz
-RUN wget -O - https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz | tar -xz; \
-    cd paho.mqtt.c-${PAHO_VER}; \
-    make; \
-    make install;
 
 #Install va gstreamer plugins
 #Has a dependency on OpenCV, GStreamer
@@ -493,12 +601,7 @@ RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
     rm -rf /var/lib/apt/lists/*;
 
 # Install
-COPY --from=build /home/build /
-ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
-ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/gstreamer-1.0
-ENV PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-ENV LIBRARY_PATH=${LIBRARY_PATH}:/usr/lib
-ENV PATH=${PATH}:/usr/bin
-
+#COPY --from=build_gst /home/build /
+#COPY --from=build_dldt /home/build /
+#COPY --from=build_gst_analytics /home/build /
+#include(install.m4)

@@ -1,5 +1,5 @@
 ifelse(index(DOCKER_IMAGE,ubuntu),-1,,
-    RUN apt-get install -y -q --no-install-recommends gtk-doc-tools
+    RUN apt-get update && apt-get install -y -q --no-install-recommends gtk-doc-tools
 )dnl
 
 ifelse(index(DOCKER_IMAGE,centos),-1,,
@@ -9,14 +9,6 @@ ifelse(index(DOCKER_IMAGE,centos),-1,,
 ifelse(index(DOCKER_IMAGE,centos74),-1,,
     RUN yum install -y -q binutils
 )dnl
-
-
-ARG PAHO_VER=1.3.0
-ARG PAHO_REPO=https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz
-RUN wget -O - https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz | tar -xz; \
-    cd paho.mqtt.c-${PAHO_VER}; \
-    make; \
-    make install;
 
 #Install va gstreamer plugins
 #Has a dependency on OpenCV, GStreamer
