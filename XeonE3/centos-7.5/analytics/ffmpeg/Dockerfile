@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -21,6 +22,7 @@ RUN wget -O - ${AUTOMAKE_REPO} | tar xJ && \
     cd automake-${AUTOMAKE_VER} && \
     ./configure --prefix=/usr --libdir=/usr/lib64 --disable-doc && \ 
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Build NASM
@@ -361,6 +363,8 @@ RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/o
         echo "Cflags: -I\${includedir}" >> "$pc"; \
     done;
 
+
+ARG TESTING=test
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 
@@ -460,8 +464,7 @@ RUN cd /home/FFmpeg && \
 
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -478,7 +481,6 @@ RUN yum install -y epel-release; \
     rm -rf /var/cache/yum/*;
 
 # Install
-COPY --from=build /home/build /
 ENV LIBVA_DRIVERS_PATH=/usr/lib64/dri
 ENV LIBVA_DRIVER_NAME=iHD
 RUN yum install -y -q dnf dnf-plugins-core yum-plugin-copr

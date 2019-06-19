@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -21,6 +22,7 @@ RUN wget -O - ${AUTOMAKE_REPO} | tar xJ && \
     cd automake-${AUTOMAKE_VER} && \
     ./configure --prefix=/usr --libdir=/usr/lib64 --disable-doc && \ 
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Build NASM
@@ -338,8 +340,7 @@ RUN cd SVT-AV1/gstreamer-plugin && \
     make install
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -356,5 +357,4 @@ RUN yum install -y epel-release; \
     rm -rf /var/cache/yum/*;
 
 # Install
-COPY --from=build /home/build /
 

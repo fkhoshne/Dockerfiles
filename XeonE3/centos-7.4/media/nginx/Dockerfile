@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -21,6 +22,7 @@ RUN wget -O - ${AUTOMAKE_REPO} | tar xJ && \
     cd automake-${AUTOMAKE_VER} && \
     ./configure --prefix=/usr --libdir=/usr/lib64 --disable-doc && \ 
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 
@@ -71,7 +73,6 @@ RUN  \
     yum install -y -q openssl-libs pcre2 zlib libxslt libxml2 ; \
     rm -rf /var/cache/yum/*;
 # Install
-COPY --from=build /home/build /
 CMD /usr/sbin/nginx
 VOLUME /etc/nginx /var/www/html /var/www/tmp/client_body /var/www/tmp/proxy /var/www/tmp/fastcgi /var/www/tmp/uwsgi /var/www/tmp/scgi /var/www/cache /var/www/dash /var/www/hls
 EXPOSE 80 1935

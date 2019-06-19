@@ -41,8 +41,13 @@ RUN  wget -O - ${YASM_REPO} | tar xz && \
      make -j8 && \
      make install
 
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
 
-FROM ubuntu:18.04 AS build_gst
+FROM ubuntu:18.04 AS build_dependencies
 WORKDIR /home
 COPY --from=build /home/build /
 # COMMON BUILD TOOLS
@@ -184,49 +189,46 @@ RUN  wget -O - ${X265_REPO} | tar xz && mv x265-${X265_VER} x265 && \
      make install DESTDIR="/home/build" && \
      make install
 
-# Fetch SVT-HEVC
-ARG SVT_HEVC_VER=20a47b0d904e9d99e089d93d7c33af92788cbfdb
-ARG SVT_HEVC_REPO=https://github.com/intel/SVT-HEVC
 
-RUN git clone ${SVT_HEVC_REPO} && \
-    cd SVT-HEVC/Build/linux && \
-    git checkout ${SVT_HEVC_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install 
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
 
 
-# Fetch SVT-AV1
-ARG SVT_AV1_VER=v0.5.0
-ARG SVT_AV1_REPO=https://github.com/OpenVisualCloud/SVT-AV1
+FROM ubuntu:18.04 AS build_gst
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
 
-RUN git clone ${SVT_AV1_REPO} && \
-    cd SVT-AV1/Build/linux && \
-    git checkout ${SVT_AV1_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
 
-#Remove build residue from SVT-AV1 build -- temp fix for bug
-RUN if [ -d "build/home/" ]; then rm -rf build/home/; fi
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
 
-
-# Fetch SVT-VP9
-ARG SVT_VP9_VER=d18b4acf9139be2e83150e318ffd3dba1c432e74
-ARG SVT_VP9_REPO=https://github.com/OpenVisualCloud/SVT-VP9
-
-RUN git clone ${SVT_VP9_REPO} && \
-    cd SVT-VP9/Build/linux && \
-    git checkout ${SVT_VP9_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install 
 
 
 # Build the gstremaer core
@@ -360,6 +362,51 @@ RUN wget -O - ${GST_PLUGIN_LIBAV_REPO} | tar xJ && \
     make install
 
 
+
+# Fetch SVT-HEVC
+ARG SVT_HEVC_VER=20a47b0d904e9d99e089d93d7c33af92788cbfdb
+ARG SVT_HEVC_REPO=https://github.com/intel/SVT-HEVC
+
+RUN git clone ${SVT_HEVC_REPO} && \
+    cd SVT-HEVC/Build/linux && \
+    git checkout ${SVT_HEVC_VER} && \
+    mkdir -p ../../Bin/Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j8 && \
+    make install DESTDIR=/home/build && \
+    make install 
+
+
+# Fetch SVT-AV1
+ARG SVT_AV1_VER=v0.5.0
+ARG SVT_AV1_REPO=https://github.com/OpenVisualCloud/SVT-AV1
+
+RUN git clone ${SVT_AV1_REPO} && \
+    cd SVT-AV1/Build/linux && \
+    git checkout ${SVT_AV1_VER} && \
+    mkdir -p ../../Bin/Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j8 && \
+    make install DESTDIR=/home/build && \
+    make install
+
+#Remove build residue from SVT-AV1 build -- temp fix for bug
+RUN if [ -d "build/home/" ]; then rm -rf build/home/; fi
+
+
+# Fetch SVT-VP9
+ARG SVT_VP9_VER=d18b4acf9139be2e83150e318ffd3dba1c432e74
+ARG SVT_VP9_REPO=https://github.com/OpenVisualCloud/SVT-VP9
+
+RUN git clone ${SVT_VP9_REPO} && \
+    cd SVT-VP9/Build/linux && \
+    git checkout ${SVT_VP9_VER} && \
+    mkdir -p ../../Bin/Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j8 && \
+    make install DESTDIR=/home/build && \
+    make install 
+
 # Build gstremaer plugin for svt
 
 RUN cd SVT-HEVC/gstreamer-plugin && \
@@ -380,10 +427,32 @@ RUN cd SVT-AV1/gstreamer-plugin && \
     make install DESTDIR=/home/build && \
     make install
 
+ARG OPENCV_VER=4.1.0
+ARG OPENCV_REPO=https://github.com/opencv/opencv/archive/${OPENCV_VER}.tar.gz
+
+RUN  ln -sf /usr/share/zoneinfo/UTC /etc/localtime;
+
+RUN wget ${OPENCV_REPO} && \
+    tar -zxvf ${OPENCV_VER}.tar.gz && \
+    cd opencv-${OPENCV_VER} && \
+    mkdir build && \
+    cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -D BUILD_EXAMPLES=OFF -D BUILD_PERF_TESTS=OFF -D BUILD_DOCS=OFF -D BUILD_TESTS=OFF .. && \
+    make -j $(nproc) && \
+    make install DESTDIR=/home/build && \
+    make install
+
+
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
 
 FROM ubuntu:18.04 AS build_dldt
 WORKDIR /home
 COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
 # COMMON BUILD TOOLS
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
 # Install automake, use version 1.14 on CentOS
@@ -413,9 +482,6 @@ RUN  wget -O - ${YASM_REPO} | tar xz && \
      make install
 
 
-RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
-    DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends libnuma1 libssl1.1 libglib2.0 libpango-1.0-0 libpangocairo-1.0-0 gobject-introspection libcurl3-gnutls libpng16-16 libxv1 libvisual-0.4-0 libgl1-mesa-glx libpango-1.0-0 libtheora0 libcdparanoia0 libasound2 libsoup2.4-1 libjpeg8 libjpeg-turbo8 ; \
-    rm -rf /var/lib/apt/lists/*;
 
 # Build DLDT-Inference Engine
 ARG DLDT_VER=2019_R1.1
@@ -485,6 +551,8 @@ RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/o
         echo "Cflags: -I\${includedir}" >> "$pc"; \
     done;
 
+
+ARG TESTING=test
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 
@@ -492,10 +560,16 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/i
 
 
 
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
 
 FROM ubuntu:18.04 AS build_gst_analytics
 WORKDIR /home
 COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
 COPY --from=build_gst /home/build /
 COPY --from=build_dldt /home/build /
 # COMMON BUILD TOOLS
@@ -535,21 +609,6 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/i
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 
 
-ARG OPENCV_VER=4.1.0
-ARG OPENCV_REPO=https://github.com/opencv/opencv/archive/${OPENCV_VER}.tar.gz
-
-RUN  ln -sf /usr/share/zoneinfo/UTC /etc/localtime;
-
-RUN wget ${OPENCV_REPO} && \
-    tar -zxvf ${OPENCV_VER}.tar.gz && \
-    cd opencv-${OPENCV_VER} && \
-    mkdir build && \
-    cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -D BUILD_EXAMPLES=OFF -D BUILD_PERF_TESTS=OFF -D BUILD_DOCS=OFF -D BUILD_TESTS=OFF .. && \
-    make -j $(nproc) && \
-    make install DESTDIR=/home/build && \
-    make install
-
 RUN apt-get update && apt-get install -y -q --no-install-recommends gtk-doc-tools
 
 
@@ -583,8 +642,7 @@ RUN mkdir -p /usr/lib/x86_64-linux-gnu/gstreamer-1.0 && \
 
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -601,7 +659,15 @@ RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
     rm -rf /var/lib/apt/lists/*;
 
 # Install
-#COPY --from=build_gst /home/build /
-#COPY --from=build_dldt /home/build /
-#COPY --from=build_gst_analytics /home/build /
-#include(install.m4)
+COPY --from=build_dependencies /home/build /
+COPY --from=build_gst /home/build /
+COPY --from=build_dldt /home/build /
+COPY --from=build_gst_analytics /home/build /
+ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/gstreamer-1.0
+ENV PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
+ENV LIBRARY_PATH=${LIBRARY_PATH}:/usr/lib
+ENV PATH=${PATH}:/usr/bin
+

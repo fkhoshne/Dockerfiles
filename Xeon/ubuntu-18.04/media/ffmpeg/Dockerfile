@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -224,8 +225,7 @@ RUN cd /home/FFmpeg && \
 
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -241,5 +241,4 @@ RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
     rm -rf /var/lib/apt/lists/*;
 
 # Install
-COPY --from=build /home/build /
 

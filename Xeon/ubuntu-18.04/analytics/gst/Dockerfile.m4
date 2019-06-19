@@ -4,8 +4,9 @@ WORKDIR /home
 define(`BUILD_LINKAGE',shared)dnl
 
 include(build-tools.m4)
+include(cleanup.m4)dnl
 
-FROM ubuntu:18.04 AS build_gst
+FROM ubuntu:18.04 AS build_dependencies
 WORKDIR /home
 COPY --from=build /home/build /
 include(common-build-tools.m4)
@@ -19,9 +20,14 @@ include(libvpx.m4)
 include(libaom.m4)
 include(libx264.m4)
 include(libx265.m4)
-include(svt-hevc.m4)
-include(svt-av1.m4)
-include(svt-vp9.m4)
+
+include(cleanup.m4)
+
+FROM ubuntu:18.04 AS build_gst
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+include(common-build-tools.m4)
 
 include(gst.m4)
 include(gst-orc.m4)
@@ -30,26 +36,34 @@ include(gst-plugin-good.m4)
 include(gst-plugin-bad.m4)
 include(gst-plugin-ugly.m4)
 include(gst-plugin-libav.m4)
+
+include(svt-hevc.m4)
+include(svt-av1.m4)
+include(svt-vp9.m4)
 include(gst-plugin-svt.m4)
+include(opencv.m4)
+
+include(cleanup.m4)dnl
 
 FROM ubuntu:18.04 AS build_dldt
 WORKDIR /home
 COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
 include(common-build-tools.m4)
-include(install.pkgs.m4)
 
 include(dldt-ie.m4)
+include(cleanup.m4)dnl
 
 FROM ubuntu:18.04 AS build_gst_analytics
 WORKDIR /home
 COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
 COPY --from=build_gst /home/build /
 COPY --from=build_dldt /home/build /
 include(common-build-tools.m4)
 include(install.pkgs.m4)
 include(install.m4)
 
-include(opencv.m4)
 include(gstreamer-videoanalytics.m4)
 include(cleanup.m4)dnl
 
@@ -62,7 +76,8 @@ WORKDIR /home
 include(install.pkgs.m4)
 
 # Install
-#COPY --from=build_gst /home/build /
-#COPY --from=build_dldt /home/build /
-#COPY --from=build_gst_analytics /home/build /
-#include(install.m4)
+COPY --from=build_dependencies /home/build /
+COPY --from=build_gst /home/build /
+COPY --from=build_dldt /home/build /
+COPY --from=build_gst_analytics /home/build /
+include(install.m4)

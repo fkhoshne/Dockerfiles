@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -39,6 +40,45 @@ RUN  wget -O - ${YASM_REPO} | tar xz && \
      ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
      make -j8 && \
      make install
+
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
+
+FROM ubuntu:18.04 as build_dependencies
+WORKDIR /home
+COPY --from=build /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
+
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+
 
 # Build ogg
 ARG OGG_VER=1.3.3
@@ -149,51 +189,47 @@ RUN  wget -O - ${X265_REPO} | tar xz && mv x265-${X265_VER} x265 && \
      make install DESTDIR="/home/build" && \
      make install
 
-# Fetch SVT-HEVC
-ARG SVT_HEVC_VER=20a47b0d904e9d99e089d93d7c33af92788cbfdb
-ARG SVT_HEVC_REPO=https://github.com/intel/SVT-HEVC
 
-RUN git clone ${SVT_HEVC_REPO} && \
-    cd SVT-HEVC/Build/linux && \
-    git checkout ${SVT_HEVC_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install 
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
+
+FROM ubuntu:18.04 as build_dldt
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
+
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
 
 
-# Fetch SVT-AV1
-ARG SVT_AV1_VER=v0.5.0
-ARG SVT_AV1_REPO=https://github.com/OpenVisualCloud/SVT-AV1
 
-RUN git clone ${SVT_AV1_REPO} && \
-    cd SVT-AV1/Build/linux && \
-    git checkout ${SVT_AV1_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install
-
-#Remove build residue from SVT-AV1 build -- temp fix for bug
-RUN if [ -d "build/home/" ]; then rm -rf build/home/; fi
-
-
-# Fetch SVT-VP9
-ARG SVT_VP9_VER=d18b4acf9139be2e83150e318ffd3dba1c432e74
-ARG SVT_VP9_REPO=https://github.com/OpenVisualCloud/SVT-VP9
-
-RUN git clone ${SVT_VP9_REPO} && \
-    cd SVT-VP9/Build/linux && \
-    git checkout ${SVT_VP9_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install 
-
-#include(transform360.m4)
 # Build DLDT-Inference Engine
 ARG DLDT_VER=2019_R1.1
 ARG DLDT_REPO=https://github.com/opencv/dldt.git
@@ -202,7 +238,7 @@ ARG DLDT_C_API_2=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thir
 ARG DLDT_C_API_3=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0003-Refine-IE-C-API.patch
 ARG DLDT_C_API_4=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0004-Fix-code-style-and-symbols-visibility-for-2019R1.patch
 
-RUN apt-get -y install libusb-1.0.0-dev
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install libusb-1.0.0-dev
 
 RUN git clone -b ${DLDT_VER} ${DLDT_REPO} && \
     cd dldt && \
@@ -262,12 +298,101 @@ RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/o
         echo "Cflags: -I\${includedir}" >> "$pc"; \
     done;
 
+
+ARG TESTING=test
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 
 #install Model Optimizer in the DLDT for Dev
 
 
+
+# Clean up after build
+RUN rm -rf /home/build/usr/share/doc && \
+    rm -rf /home/build/usr/share/gtk-doc && \
+    rm -rf /home/build/usr/share/man && \
+    find /home/build -name "*.a" -exec rm -f {} \;
+
+FROM ubuntu:18.04 as build_ffmpeg
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+COPY --from=build_dldt /home/build /
+# COMMON BUILD TOOLS
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends build-essential autoconf make git wget pciutils cpio libtool lsb-release ca-certificates pkg-config bison flex libcurl4-gnutls-dev zlib1g-dev
+# Install automake, use version 1.14 on CentOS
+ARG AUTOMAKE_VER=1.14
+ARG AUTOMAKE_REPO=https://ftp.gnu.org/pub/gnu/automake/automake-${AUTOMAKE_VER}.tar.xz
+    RUN apt-get install -y -q automake
+
+# Build NASM
+ARG NASM_VER=2.13.03
+ARG NASM_REPO=https://www.nasm.us/pub/nasm/releasebuilds/${NASM_VER}/nasm-${NASM_VER}.tar.bz2
+RUN  wget ${NASM_REPO} && \
+     tar -xaf nasm* && \
+     cd nasm-${NASM_VER} && \
+     ./autogen.sh && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+# Build YASM
+ARG YASM_VER=1.3.0
+ARG YASM_REPO=https://www.tortall.net/projects/yasm/releases/yasm-${YASM_VER}.tar.gz
+RUN  wget -O - ${YASM_REPO} | tar xz && \
+     cd yasm-${YASM_VER} && \
+     sed -i "s/) ytasm.*/)/" Makefile.in && \
+     ./configure --prefix="/usr" --libdir=/usr/lib/x86_64-linux-gnu && \
+     make -j8 && \
+     make install
+
+
+
+# Fetch SVT-HEVC
+ARG SVT_HEVC_VER=20a47b0d904e9d99e089d93d7c33af92788cbfdb
+ARG SVT_HEVC_REPO=https://github.com/intel/SVT-HEVC
+
+RUN git clone ${SVT_HEVC_REPO} && \
+    cd SVT-HEVC/Build/linux && \
+    git checkout ${SVT_HEVC_VER} && \
+    mkdir -p ../../Bin/Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j8 && \
+    make install DESTDIR=/home/build && \
+    make install 
+
+
+# Fetch SVT-AV1
+ARG SVT_AV1_VER=v0.5.0
+ARG SVT_AV1_REPO=https://github.com/OpenVisualCloud/SVT-AV1
+
+RUN git clone ${SVT_AV1_REPO} && \
+    cd SVT-AV1/Build/linux && \
+    git checkout ${SVT_AV1_VER} && \
+    mkdir -p ../../Bin/Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j8 && \
+    make install DESTDIR=/home/build && \
+    make install
+
+#Remove build residue from SVT-AV1 build -- temp fix for bug
+RUN if [ -d "build/home/" ]; then rm -rf build/home/; fi
+
+
+# Fetch SVT-VP9
+ARG SVT_VP9_VER=d18b4acf9139be2e83150e318ffd3dba1c432e74
+ARG SVT_VP9_REPO=https://github.com/OpenVisualCloud/SVT-VP9
+
+RUN git clone ${SVT_VP9_REPO} && \
+    cd SVT-VP9/Build/linux && \
+    git checkout ${SVT_VP9_VER} && \
+    mkdir -p ../../Bin/Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
+    make -j8 && \
+    make install DESTDIR=/home/build && \
+    make install 
+
+#include(transform360.m4)
 
 # Build libcjson
 ARG LIBCJSON_VER=1.7.11
@@ -361,8 +486,7 @@ RUN cd /home/FFmpeg && \
 
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -371,14 +495,15 @@ FROM ubuntu:18.04
 LABEL Description="This is the image for DLDT and FFMPEG on Ubuntu 18.04"
 LABEL Vendor="Intel Corporation"
 WORKDIR /home
-
 # Prerequisites
 RUN ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
     DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends    libnuma1 libass9 libssl1.1 libpciaccess0   ; \
     rm -rf /var/lib/apt/lists/*;
 
 # Install
-COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+COPY --from=build_dldt /home/build /
+COPY --from=build_ffmpeg /home/build /
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share

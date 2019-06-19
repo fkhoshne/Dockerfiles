@@ -4,6 +4,13 @@ WORKDIR /home
 define(`BUILD_LINKAGE',shared)dnl
 
 include(build-tools.m4)
+include(cleanup.m4)dnl
+
+FROM ubuntu:18.04 as build_dependencies
+WORKDIR /home
+COPY --from=build /home/build /
+include(common-build-tools.m4)
+
 include(libogg.m4)
 include(libvorbis.m4)
 include(libmp3lame.m4)
@@ -13,11 +20,30 @@ include(libvpx.m4)
 include(libaom.m4)
 include(libx264.m4)
 include(libx265.m4)
+
+include(cleanup.m4)dnl
+
+FROM ubuntu:18.04 as build_dldt
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+include(common-build-tools.m4)
+
+include(dldt-ie.m4)
+include(cleanup.m4)dnl
+
+FROM ubuntu:18.04 as build_ffmpeg
+WORKDIR /home
+COPY --from=build /home/build /
+COPY --from=build_dependencies /home/build /
+COPY --from=build_dldt /home/build /
+include(common-build-tools.m4)
+
 include(svt-hevc.m4)
 include(svt-av1.m4)
 include(svt-vp9.m4)
 #include(transform360.m4)
-include(dldt-ie.m4)
+
 include(libcjson.m4)
 include(librdkafka.m4)
 include(ffmpeg.m4)
@@ -27,9 +53,11 @@ FROM ubuntu:18.04
 LABEL Description="This is the image for DLDT and FFMPEG on Ubuntu 18.04"
 LABEL Vendor="Intel Corporation"
 WORKDIR /home
-
 # Prerequisites
 include(install.pkgs.m4)
 
 # Install
+COPY --from=build_dependencies /home/build /
+COPY --from=build_dldt /home/build /
+COPY --from=build_ffmpeg /home/build /
 include(install.m4)

@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -300,7 +301,7 @@ ARG DLDT_C_API_2=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thir
 ARG DLDT_C_API_3=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0003-Refine-IE-C-API.patch
 ARG DLDT_C_API_4=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/0004-Fix-code-style-and-symbols-visibility-for-2019R1.patch
 
-RUN apt-get -y install libusb-1.0.0-dev
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get -y install libusb-1.0.0-dev
 
 RUN git clone -b ${DLDT_VER} ${DLDT_REPO} && \
     cd dldt && \
@@ -360,6 +361,8 @@ RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/o
         echo "Cflags: -I\${includedir}" >> "$pc"; \
     done;
 
+
+ARG TESTING=test
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 
@@ -557,17 +560,9 @@ RUN wget ${OPENCV_REPO} && \
     make install DESTDIR=/home/build && \
     make install
 
-RUN apt-get install -y -q --no-install-recommends gtk-doc-tools
+RUN apt-get update && apt-get install -y -q --no-install-recommends gtk-doc-tools
 
 
-
-
-ARG PAHO_VER=1.3.0
-ARG PAHO_REPO=https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz
-RUN wget -O - https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz | tar -xz; \
-    cd paho.mqtt.c-${PAHO_VER}; \
-    make; \
-    make install;
 
 #Install va gstreamer plugins
 #Has a dependency on OpenCV, GStreamer
@@ -598,8 +593,7 @@ RUN mkdir -p /usr/lib/x86_64-linux-gnu/gstreamer-1.0 && \
 
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -615,7 +609,6 @@ libdrm2 ; \
     rm -rf /var/lib/apt/lists/*;
 
 # Install
-COPY --from=build /home/build /
 ENV LIBVA_DRIVERS_PATH=/usr/lib/x86_64-linux-gnu/dri
 ENV LIBVA_DRIVER_NAME=iHD
 RUN apt-get update && apt-get install -y clinfo

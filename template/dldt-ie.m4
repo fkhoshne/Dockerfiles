@@ -72,6 +72,8 @@ RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/o
     done;
 define(`FFMPEG_CONFIG_DLDT_IE',--enable-libinference_engine )dnl
 
+
+ARG TESTING=test
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 

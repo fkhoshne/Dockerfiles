@@ -12,6 +12,7 @@ RUN wget -O - ${CMAKE_REPO}/v${CMAKE_VER%.*}/cmake-${CMAKE_VER}.tar.gz | tar xz 
     cd cmake-${CMAKE_VER} && \
     ./bootstrap --prefix="/usr" --system-curl && \
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Install automake, use version 1.14 on CentOS
@@ -21,6 +22,7 @@ RUN wget -O - ${AUTOMAKE_REPO} | tar xJ && \
     cd automake-${AUTOMAKE_VER} && \
     ./configure --prefix=/usr --libdir=/usr/lib64 --disable-doc && \ 
     make -j8 && \
+    make install DESTDIR=/home/build && \
     make install
 
 # Build NASM
@@ -270,6 +272,8 @@ RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/o
         echo "Cflags: -I\${includedir}" >> "$pc"; \
     done;
 
+
+ARG TESTING=test
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 
@@ -446,14 +450,6 @@ RUN yum install -y -q glib2-devel gtk-dock openblas
 
 RUN yum install -y -q binutils
 
-
-ARG PAHO_VER=1.3.0
-ARG PAHO_REPO=https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz
-RUN wget -O - https://github.com/eclipse/paho.mqtt.c/archive/v${PAHO_VER}.tar.gz | tar -xz; \
-    cd paho.mqtt.c-${PAHO_VER}; \
-    make; \
-    make install;
-
 #Install va gstreamer plugins
 #Has a dependency on OpenCV, GStreamer
 ARG VA_GSTREAMER_PLUGINS_VER=0.3.1
@@ -483,8 +479,7 @@ RUN mkdir -p /usr/lib64/gstreamer-1.0 && \
 
 
 # Clean up after build
-RUN rm -rf /home/build/usr/include && \
-    rm -rf /home/build/usr/share/doc && \
+RUN rm -rf /home/build/usr/share/doc && \
     rm -rf /home/build/usr/share/gtk-doc && \
     rm -rf /home/build/usr/share/man && \
     find /home/build -name "*.a" -exec rm -f {} \;
@@ -502,7 +497,6 @@ libsoup libjpeg-turbo ; \
     rm -rf /var/cache/yum/*;
 
 # Install
-COPY --from=build /home/build /
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
