@@ -153,55 +153,6 @@ RUN  wget -O - ${X265_REPO} | tar xz && mv x265-${X265_VER} x265 && \
      make install DESTDIR="/home/build" && \
      make install
 
-# Fetch SVT-HEVC
-ARG SVT_HEVC_VER=20a47b0d904e9d99e089d93d7c33af92788cbfdb
-ARG SVT_HEVC_REPO=https://github.com/intel/SVT-HEVC
-
-RUN yum install -y -q patch centos-release-scl && \
-    yum install -y -q devtoolset-7
-
-RUN git clone ${SVT_HEVC_REPO} && \
-    cd SVT-HEVC/Build/linux && \
-    git checkout ${SVT_HEVC_VER} && \
-    mkdir -p ../../Bin/Release && \
-    ( source /opt/rh/devtoolset-7/enable && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install )
-
-
-# Fetch SVT-AV1
-ARG SVT_AV1_VER=v0.6.0
-ARG SVT_AV1_REPO=https://github.com/OpenVisualCloud/SVT-AV1
-
-RUN git clone ${SVT_AV1_REPO} && \
-    cd SVT-AV1/Build/linux && \
-    git checkout ${SVT_AV1_VER} && \
-    mkdir -p ../../Bin/Release && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install
-
-#Remove build residue from SVT-AV1 build -- temp fix for bug
-RUN if [ -d "build/home/" ]; then rm -rf build/home/; fi
-
-
-# Fetch SVT-VP9
-ARG SVT_VP9_VER=d18b4acf9139be2e83150e318ffd3dba1c432e74
-ARG SVT_VP9_REPO=https://github.com/OpenVisualCloud/SVT-VP9
-
-RUN git clone ${SVT_VP9_REPO} && \
-    cd SVT-VP9/Build/linux && \
-    git checkout ${SVT_VP9_VER} && \
-    mkdir -p ../../Bin/Release && \
-  ( source /opt/rh/devtoolset-7/enable && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_INSTALL_LIBDIR=lib64 -DCMAKE_ASM_NASM_COMPILER=yasm ../.. && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install )
-
 # Build DLDT-Inference Engine
 ARG DLDT_VER=2019_R2
 ARG DLDT_REPO=https://github.com/opencv/dldt.git
@@ -281,11 +232,16 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/i
 
 
 
+
+
+#include(svt-hevc.m4)
+#include(svt-av1.m4)
+#include(svt-vp9.m4)
 # Build the gstremaer core
 ARG GST_VER=1.16.0
 ARG GST_REPO=https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-${GST_VER}.tar.xz
 
-RUN  yum install -y -q glib2-devel-2.56.1 gettext-devel gobject-introspection gobject-introspection-devel python-gobject-base
+RUN  yum install -y -q autoconf automake libtools which glib2-devel-2.56.1 gettext-devel gobject-introspection gobject-introspection-devel python-gobject-base
 RUN  wget -O - ${GST_REPO} | tar xJ && \
      cd gstreamer-${GST_VER} && \
      ./autogen.sh \
@@ -411,26 +367,7 @@ RUN wget -O - ${GST_PLUGIN_LIBAV_REPO} | tar xJ && \
     make install
 
 
-# Build gstremaer plugin for svt
-
-RUN cd SVT-HEVC/gstreamer-plugin && \
-    cmake . && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install
-
-RUN cd SVT-VP9/gstreamer-plugin && \
-    cmake . && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install
-
-RUN cd SVT-AV1/gstreamer-plugin && \
-    cmake . && \
-    make -j8 && \
-    make install DESTDIR=/home/build && \
-    make install
-
+#include(gst-plugin-svt.m4)
 ARG OPENCV_VER=4.1.0
 ARG OPENCV_REPO=https://github.com/opencv/opencv/archive/${OPENCV_VER}.tar.gz
 
@@ -548,14 +485,14 @@ WORKDIR /home
 # Prerequisites
 RUN yum install -y epel-release; \
     yum install -y -q numactl openssl glib2-2.56.1 pango gobject-introspection libpng12 libXv libvisual mesa-libGL pango glib2 alsa-lib openblas-serial uuid \
-libsoup libjpeg-turbo ; \
+libsoup libjpeg-turbo glibc-static libstdc++-static libstdc++ libgcc gcc-c++ ; \
     yum remove -y -q epel-release; \
     rm -rf /var/cache/yum/*;
 
 # Install
 COPY --from=build /home/build /
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}:/usr/local/lib:/usr/lib:/usr/local/lib64:/usr/lib64
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/gstreamer-1.0
 ENV PKG_CONFIG_PATH=/usr/lib64/pkgconfig

@@ -273,6 +273,8 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/i
 
 
 
+
+
 # Build libjson-c
 ARG LIBJSONC_VER=0.13.1-20180305
 ARG LIBJSONC_REPO=https://github.com/json-c/json-c/archive/json-c-${LIBJSONC_VER}.tar.gz
@@ -386,6 +388,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-
 # Install
 COPY --from=build /home/build /
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}:/usr/local/lib:/usr/lib:/usr/local/lib64:/usr/lib64
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 

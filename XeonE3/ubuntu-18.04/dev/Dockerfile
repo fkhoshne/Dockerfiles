@@ -400,12 +400,14 @@ RUN cp -r dldt/model-optimizer /home/build/opt/intel/dldt/model-optimizer
 
 
 
+
+
 # Build the gstremaer core
 ARG GST_VER=1.16.0
 ARG GST_REPO=https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-${GST_VER}.tar.xz
 
 RUN  ln -sf /usr/share/zoneinfo/UTC /etc/localtime; \
-     DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends libglib2.0-dev gobject-introspection libgirepository1.0-dev libpango-1.0-0 libpangocairo-1.0-0 autopoint libcurl3-gnutls
+     DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y -q --no-install-recommends autoconf libglib2.0-dev gobject-introspection libgirepository1.0-dev libpango-1.0-0 libpangocairo-1.0-0 autopoint libcurl3-gnutls
 RUN  wget -O - ${GST_REPO} | tar xJ && \
      cd gstreamer-${GST_VER} && \
      ./autogen.sh \
@@ -766,7 +768,7 @@ RUN apt-get update && apt-get install -y clinfo
 ENV GST_VAAPI_ALL_DRIVERS=1
 ENV DISPLAY=:0.0
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}:/usr/local/lib:/usr/lib:/usr/local/lib64:/usr/lib64
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV PYTHONPATH=${PYTHONPATH}:/mo_libs
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/gstreamer-1.0

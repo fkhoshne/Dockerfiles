@@ -321,11 +321,13 @@ RUN cp -r dldt/model-optimizer /home/build/opt/intel/dldt/model-optimizer
 
 
 
+
+
 # Build the gstremaer core
 ARG GST_VER=1.16.0
 ARG GST_REPO=https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-${GST_VER}.tar.xz
 
-RUN  yum install -y -q glib2-devel-2.56.1 gettext-devel gobject-introspection gobject-introspection-devel python-gobject-base
+RUN  yum install -y -q autoconf automake libtools which glib2-devel-2.56.1 gettext-devel gobject-introspection gobject-introspection-devel python-gobject-base
 RUN  wget -O - ${GST_REPO} | tar xJ && \
      cd gstreamer-${GST_VER} && \
      ./autogen.sh \
@@ -649,14 +651,14 @@ WORKDIR /home
 # Prerequisites
 RUN yum install -y epel-release; \
     yum install -y -q   libxcb SDL2 libass numactl   glib2-2.56.1 pango gobject-introspection libpng12 libXv libvisual mesa-libGL pango glib2 alsa-lib openblas-serial uuid \
-libsoup libjpeg-turbo python-yaml ; \
+libsoup libjpeg-turbo python-yaml glibc-static libstdc++-static libstdc++ libgcc gcc-c++ ; \
     yum remove -y -q epel-release; \
     rm -rf /var/cache/yum/*;
 
 # Install
 COPY --from=build /home/build /
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}:/usr/local/lib:/usr/lib:/usr/local/lib64:/usr/lib64
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV PYTHONPATH=${PYTHONPATH}:/mo_libs
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/gstreamer-1.0

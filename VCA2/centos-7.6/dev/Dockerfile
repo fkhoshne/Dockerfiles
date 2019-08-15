@@ -371,11 +371,13 @@ RUN cp -r dldt/model-optimizer /home/build/opt/intel/dldt/model-optimizer
 
 
 
+
+
 # Build the gstremaer core
 ARG GST_VER=1.16.0
 ARG GST_REPO=https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-${GST_VER}.tar.xz
 
-RUN  yum install -y -q glib2-devel-2.56.1 gettext-devel gobject-introspection gobject-introspection-devel python-gobject-base
+RUN  yum install -y -q autoconf automake libtools which glib2-devel-2.56.1 gettext-devel gobject-introspection gobject-introspection-devel python-gobject-base
 RUN  wget -O - ${GST_REPO} | tar xJ && \
      cd gstreamer-${GST_VER} && \
      ./autogen.sh \
@@ -607,7 +609,7 @@ WORKDIR /home
 
 # Prerequisites
 RUN yum install -y epel-release; \
-    yum install -y -q   libxcb SDL2 libass numactl libvdpau  glib2-2.56.1 pango gobject-introspection libxcb mesa-libGL libXrandr libpng12 libXv libvisual mesa-libGL pango glib2 alsa-lib libpciaccess libX11 mesa-dri-drivers mesa-libGL libdrm  libsoup libjpeg-turbo python-yaml ; \
+    yum install -y -q   libxcb SDL2 libass numactl libvdpau  glib2-2.56.1 pango gobject-introspection libxcb mesa-libGL libXrandr libpng12 libXv libvisual mesa-libGL pango glib2 alsa-lib libpciaccess libX11 mesa-dri-drivers mesa-libGL libdrm  libsoup libjpeg-turbo python-yaml glibc-static libstdc++-static libstdc++ libgcc gcc-c++ ; \
     yum remove -y -q epel-release; \
     rm -rf /var/cache/yum/*;
 
@@ -618,7 +620,7 @@ ENV LIBVA_DRIVER_NAME=iHD
 ENV GST_VAAPI_ALL_DRIVERS=1
 ENV DISPLAY=:0.0
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}:/usr/local/lib:/usr/lib:/usr/local/lib64:/usr/lib64
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV PYTHONPATH=${PYTHONPATH}:/mo_libs
 

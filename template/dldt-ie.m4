@@ -114,8 +114,13 @@ ENV PYTHONPATH=${PYTHONPATH}:/mo_libs
 )dnl
 )dnl
 
+define(`INSTALL_PKGS_IE',dnl
+ifelse(index(DOCKER_IMAGE,centos),-1, ,glibc-static libstdc++-static libstdc++ libgcc gcc-c++ )dnl
+)dnl
+
+
 define(`INSTALL_IE',dnl
 ARG libdir=/opt/intel/dldt/inference-engine/lib/intel64
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}:/usr/local/lib:/usr/lib:/usr/local/lib64:/usr/lib64
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 )dnl
