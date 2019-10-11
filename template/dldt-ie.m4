@@ -1,5 +1,5 @@
 # Build DLDT-Inference Engine
-ARG DLDT_VER=2019_R2
+ARG DLDT_VER=2019_R3
 ARG DLDT_REPO=https://github.com/opencv/dldt.git
 
 ifelse(index(DOCKER_IMAGE,centos),-1,,dnl
@@ -47,18 +47,6 @@ RUN mkdir -p build/opt/intel/dldt/inference-engine/include && \
     mkdir -p build/opt/intel/dldt/inference-engine/external/ && \
     cp -r dldt/inference-engine/temp/tbb build/opt/intel/dldt/inference-engine/external/
 
-# OPENVINO C API
-ARG C_API_VERSION=openvino_2019.2.242_d0319cd
-ARG C_API_TAR_REPO=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/dldt-c-api/dldt-c-api-${C_API_VERSION}.tgz
-
-RUN mkdir -p /tmp/c_api && \
-    cd /tmp/c_api && \
-    wget -O - ${C_API_TAR_REPO} | tar xz && \
-    cp -rf usr/* /usr && \
-    cp -rf usr/local/lib/* /home/build${libdir} && \
-    cd ../.. && \
-    rm -rf /tmp/c_api
-
 RUN for p in /usr /home/build/usr /opt/intel/dldt/inference-engine /home/build/opt/intel/dldt/inference-engine; do \
         pkgconfiglibdir="$p/ifelse(index(DOCKER_IMAGE,ubuntu),-1,lib64,lib/x86_64-linux-gnu)" && \
         mkdir -p "${pkgconfiglibdir}/pkgconfig" && \
@@ -78,6 +66,21 @@ define(`FFMPEG_CONFIG_DLDT_IE',--enable-libinference_engine )dnl
 
 ENV InferenceEngine_DIR=/opt/intel/dldt/inference-engine/share
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/dldt/inference-engine/lib:/opt/intel/dldt/inference-engine/external/tbb/lib:${libdir}
+
+# DLDT IE C API
+ARG C_API_NAME=dldt-c_api_v1-0.1
+ARG C_API_TAR_REPO=https://raw.githubusercontent.com/VCDP/FFmpeg-patch/master/thirdparty/dldt-c-api/source/${C_API_NAME}.tar.gz
+
+RUN wget -O - ${C_API_TAR_REPO} | tar xz && \
+    cd ${C_API_NAME} && \
+    mkdir -p build && cd build && \
+    cmake .. && \
+    make -j8 && \
+    make install && \
+    cp -rf /usr/local/include/dldt/* /opt/intel/dldt/inference-engine/include && \
+    c_api_libdir="/usr/local/ifelse(index(DOCKER_IMAGE,ubuntu),-1,lib64,lib)" && \
+    cp -rf ${c_api_libdir}/* ${libdir} && \
+    cp -rf ${c_api_libdir}/* /home/build${libdir}
 
 #install Model Optimizer in the DLDT for Dev
 ifelse(index(DOCKER_IMAGE,-dev),-1,,
